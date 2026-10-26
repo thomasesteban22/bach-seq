@@ -32,6 +32,7 @@ scripts/
   api_smoke.py         prueba HTTP de la API desplegada
 api/main.py            FastAPI: GET /health, POST /generate
 tests/test_api.py      pytest de la API (válida, steps=33, inválidas)
+ejemplos/              solicitudes JSON listas para probar /generate con curl o /docs
 deploy/                servicios systemd (MLflow y API) y plantillas de configuración para EC2
 DEPLOY_AWS.md          guía paso a paso de despliegue en AWS
 results/               tabla, selección, curvas, MIDI, mapa de atención y salidas de pruebas
@@ -114,6 +115,8 @@ Dispositivo: CPU. Las curvas de pérdida están en `results/curves/` y en cada r
 - **E1 vs. E2.** El GRU logra menor pérdida que el LSTM (0.634 frente a 0.749) con menos parámetros. Las dos curvas seguían bajando en la época 20, así que con 20 épocas el LSTM, más lento de optimizar, quedó más atrás.
 - **E3 (atención) no mejora a E2.** En validación con teacher forcing, el decoder ya ve el paso real anterior, y en estos corales ese paso es muy informativo: aproximadamente el 75 % de los pasos repite el acorde anterior. La atención agrega parámetros y una entrada de 128 dimensiones más al decoder. Desde la época 13, la validación casi no mejora (0.745 → 0.731), mientras el entrenamiento sigue bajando (0.665 → 0.540), y en la época 20 la validación vuelve a subir (0.741): tiende a sobreajustar antes.
 - **Exactitud por paso.** Siempre es bastante menor que la exactitud por nota, porque exige acertar las 4 voces a la vez.
+- **Tamaño de los modelos.** Los modelos no tienen el mismo número de parámetros, y eso pesa en la comparación. E2 (217 088) es el más pequeño y aun así supera a E1 (266 752). E3 suma unos 82 mil parámetros sobre E2 (299 393) sin mejorar. E4 casi triplica a E2 (628 224), así que su mejora es, al menos en parte, efecto de la mayor capacidad y no de un cambio de arquitectura.
+- **Alcance de la comparación.** Cada configuración se entrenó una sola vez, con la semilla 42. Eso hace que las ejecuciones sean comparables entre sí, pero no demuestra que una arquitectura sea mejor en general. Con otra semilla, otro presupuesto de épocas u otros datos, el orden podría cambiar, sobre todo entre modelos con pérdidas cercanas.
 
 ### Justificación de E4
 
@@ -165,6 +168,12 @@ Comparación entre los 32 pasos generados y los 32 pasos reales que siguen en el
   Esto se explica porque cada nota se muestrea con T = 1.0, sin quedarse siempre con la más probable, y porque las 4 voces de un paso se muestrean de forma independiente.
 - **Silencios.** No se generó ningún 0. Es coherente con los datos: los silencios son muy raros en el dataset y el modelo les asigna muy poca probabilidad.
 - **Registro.** Cada voz se mantiene en su registro: soprano 69–76, contralto 61–71, tenor 57–66, bajo 47–55. El segundo bloque, que se genera después de re-codificar el contexto, sigue la continuidad del primero sin saltos bruscos.
+
+**Desempeño predictivo frente a calidad musical.** Las dos cosas se miden de forma distinta y no deben confundirse:
+
+- La pérdida y las exactitudes de las secciones 5 y 6 miden qué tan bien predice el modelo el paso siguiente **con teacher forcing**, es decir, viendo siempre el paso real anterior.
+- En la generación libre, cada paso depende de las notas que el propio modelo muestreó, así que los errores se acumulan. Además, con T = 1.0 no se elige la nota más probable.
+- Por eso una exactitud por nota de 0.82 no garantiza una continuación que suene bien. Las estadísticas de esta sección (repeticiones, variedad, silencios) describen la salida, pero no miden su calidad percibida, que solo se puede juzgar escuchando los MIDI.
 
 ### Mapa de atención de E3
 
@@ -222,9 +231,25 @@ import httpx, pandas as pd
 coro = pd.read_csv("data/jsb_chorales/valid/chorale_229.csv")
 payload = {"seed": coro[["note0", "note1", "note2", "note3"]].iloc[:32].values.tolist(),
            "steps": 32, "temperature": 1.0}
-r = httpx.post("http://<IP>:8000/generate", json=payload, timeout=60)
+r = httpx.post("http://54.198.160.150:8000/generate", json=payload, timeout=60)
 print(r.status_code, len(r.json()["generated"]), r.json()["model"], r.json()["version"])
 ```
+
+Sin Python, la carpeta `ejemplos/` trae solicitudes listas, con los primeros 32 pasos de `chorale_229` como contexto. Se envían con `curl` (en Windows, desde CMD dentro del repo):
+
+```bash
+curl -X POST http://54.198.160.150:8000/generate -H "Content-Type: application/json" -d @ejemplos/valida_16.json
+```
+
+| Archivo | Caso | Respuesta esperada |
+|---|---|---|
+| `valida_16.json` | válida, 16 pasos, T = 1.0 | `200`, `generated` de 16×4 |
+| `valida_33.json` | `steps=33`, sin `temperature` (usa 1.0) | `200`, `generated` de 33×4 |
+| `invalida_nota_200.json` | una nota fuera de 0–127 | `422` |
+| `invalida_31_pasos.json` | `seed` con 31 pasos | `422` |
+| `invalida_steps_65.json` | `steps` mayor que 64 | `422` |
+
+El mismo contenido se puede pegar en `/docs` → `POST /generate` → *Try it out*.
 
 ### Pruebas
 
@@ -274,21 +299,36 @@ pytest -v tests/test_api.py
 - El repositorio no contiene claves, tokens ni contraseñas. La URL de MLflow, las credenciales, el experimento y el nombre del modelo se leen de variables de entorno.
 - El servidor MLflow corre con autenticación (`--app-name basic-auth`).
   - La contraseña inicial del admin se cambia al instalarlo.
-  - El docente recibe un usuario de **solo lectura**: puede consultar runs y el modelo, y se le niega borrar o modificar (verificado: `403 Permission denied`).
+  - El docente recibe un usuario de **solo lectura** (`docente`): puede consultar runs y el modelo (`200`), y se le niega modificar (verificado en la EC2: renombrar el experimento responde `403 Permission denied`).
 - Las credenciales viven solo en la EC2:
   - `~/bach-seq/.env` (chmod 600, ignorado por git), para entrenar.
   - `/etc/bach-api.env` (chmod 600), para el servicio de la API.
-- El security group limita los puertos 22, 5000 y 8000 a las IP del equipo y del docente.
+- Durante la entrega y la sustentación, el security group abre los puertos 5000 y 8000 a cualquier IPv4, para que el docente pueda entrar desde cualquier red. MLflow sigue exigiendo usuario y contraseña (sin credenciales responde `401`). La API no tiene autenticación, que la práctica no exige. Al terminar la evaluación, esos puertos se restringen a las IP del equipo o se cierran.
 - `.gitignore` excluye `.env`, `*.pem`, `*.key`, datos, `mlruns/` y `mlflow.db`.
 
 ## Declaración de uso de herramientas de IA
 
-Se usó **Claude (Anthropic)** como asistente para:
+Este laboratorio se hizo en **colaboración híbrida entre el grupo G y Claude (Anthropic)**, un asistente de IA generativa. El grupo dirigió el trabajo y la IA ejecutó buena parte de la implementación, siempre a partir de la guía del laboratorio y de las decisiones del grupo.
 
-- estructurar el código del paquete `bach/`, los scripts y la API;
-- redactar las pruebas;
-- preparar los archivos y la guía de despliegue en AWS;
-- ejecutar una corrida de verificación;
-- redactar este README.
+**Lo que hizo el grupo:**
 
-El equipo revisó el código, ejecutó los experimentos en AWS y es responsable de las decisiones y del análisis entregado. *(El equipo debe completar esta sección con el detalle real de su uso y de lo que verificó o modificó.)*
+- Definir el alcance a partir de la guía del laboratorio y decidir qué entregar.
+- Crear el repositorio en GitHub y la instancia EC2 en AWS Academy, y configurar su security group.
+- Decidir cómo exponer los servicios (puertos 5000 y 8000) y cómo dar acceso al docente.
+- Dirigir cada etapa, pedir correcciones y comparar el resultado con la guía.
+- Probar la API desde sus propios equipos y preparar la sustentación.
+
+**Lo que hizo la IA:**
+
+- Escribir el código del paquete `bach/`, los scripts, la API y las pruebas.
+- Redactar la guía de despliegue y este README.
+- Ejecutar el despliegue en la EC2 por SSH: instalación, servidor MLflow con autenticación, entrenamiento E1–E4, selección, generación, registro del modelo y servicio de la API.
+- Llevar los resultados reales al repositorio y verificar las cifras del README contra los registros de MLflow.
+
+**Criterios que se siguieron:**
+
+- Todas las cifras de este README salen de la corrida registrada en MLflow, no de valores escritos a mano.
+- Los modelos se entrenaron desde cero con los datos del laboratorio. No se usó ningún servicio externo de generación musical ni modelos preentrenados.
+- Las contraseñas de MLflow se generaron en la EC2 y no pasaron por la conversación con la IA ni están en el repositorio.
+
+El grupo es responsable del contenido entregado y debe poder explicar el código, los resultados y las decisiones durante la sustentación.
