@@ -1,3 +1,10 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.3.3, pluggy-1.7.0 -- /home/ubuntu/bach-seq/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/ubuntu/bach-seq
+plugins: anyio-4.15.1
+collecting ... collected 12 items
+
 tests/test_api.py::test_health PASSED                                    [  8%]
 tests/test_api.py::test_generate_valid PASSED                            [ 16%]
 tests/test_api.py::test_generate_33_steps PASSED                         [ 25%]
@@ -10,4 +17,5 @@ tests/test_api.py::test_generate_invalid[payload5] PASSED                [ 75%]
 tests/test_api.py::test_generate_invalid[payload6] PASSED                [ 83%]
 tests/test_api.py::test_generate_invalid[payload7] PASSED                [ 91%]
 tests/test_api.py::test_generate_invalid[payload8] PASSED                [100%]
-============================== 12 passed in 5.83s ==============================
+
+============================== 12 passed in 6.41s ==============================

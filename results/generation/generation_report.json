@@ -1,6 +1,6 @@
 {
   "model_run": "E4",
-  "run_id": "bcce3fe0738d4fbba0acc9f23531f41e",
+  "run_id": "1e255a87c0714723b9407ce981ab320f",
   "steps": 32,
   "temperature": 1.0,
   "sampling_seed": 42,
@@ -92,23 +92,23 @@
     "chorale": "chorale_229",
     "argmax_context_step_por_paso": [
       12,
+      12,
+      12,
       24,
-      24,
-      24,
-      24,
-      24,
-      25,
-      19,
       16,
       24,
+      16,
+      16,
+      16,
+      25,
+      24,
+      24,
       32,
+      24,
       32,
-      24,
-      24,
-      24,
-      24
+      32
     ],
-    "peso_ultimos_8_pasos_%": 22.3,
-    "peso_max_medio": 0.158
+    "peso_ultimos_8_pasos_%": 27.9,
+    "peso_max_medio": 0.119
   }
 }

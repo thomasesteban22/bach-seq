@@ -2,13 +2,13 @@
 
 Proyecto de modelos de secuencias sobre **JSB Chorales**. A partir de 32 pasos de un coral (4 voces por paso), el modelo predice los 16 pasos siguientes. Se comparan cuatro configuraciones registradas en MLflow (E1–E4). El modelo elegido se registra en Model Registry con el alias `champion` y se sirve con FastAPI en AWS EC2.
 
-> **Nota sobre los números.** Las cifras de este README salen de una corrida completa con las versiones fijadas en `requirements.txt` (Python 3.12, torch 2.4.1, CPU). Esa corrida se hizo contra un servidor MLflow configurado igual que el de la guía de despliegue: con usuario y contraseña, y con los artefactos servidos por HTTP. Después de correr el pipeline en la EC2 (ver [DEPLOY_AWS.md](DEPLOY_AWS.md)), hay que reemplazar las cifras con las que queden registradas allí. Con la semilla 42 en CPU deberían salir iguales.
+> **Nota sobre los números.** Las cifras de este README salen de la corrida del pipeline en la EC2 del proyecto (Ubuntu 24.04, t3.large, Python 3.12, torch 2.4.1 CPU), registrada en el servidor MLflow de esa misma máquina, con usuario y contraseña. Los archivos de `results/` son los de esa corrida.
 
-**Enlaces de entrega** (completar):
+**Enlaces de entrega:**
 
-- Repositorio: `https://github.com/<usuario-github>/bach-seq`
-- MLflow: `http://<IP>:5000`, experimento `nlp-bach-grupoG` (usuario de lectura para el docente)
-- API: `http://<IP>:8000/docs`
+- Repositorio: `https://github.com/thomasesteban22/bach-seq`
+- MLflow: `http://54.198.160.150:5000`, experimento `nlp-bach-grupoG` (usuario `docente`, de solo lectura)
+- API: `http://54.198.160.150:8000/docs`
 
 ---
 
@@ -102,17 +102,17 @@ Las tres arquitecturas comparten las mismas decisiones de diseño:
 
 | Run | Celda | Atención | Oculta | Mejor época | Val loss | Val acc nota | Val acc paso | Parámetros | Tiempo (s) |
 |---|---|---|---|---|---|---|---|---|---|
-| E1 | LSTM | No | 128 | 20 | 0.7490 | 0.7904 | 0.5999 | 266 752 | 70 |
-| E2 | GRU | No | 128 | 19 | 0.6339 | 0.8158 | 0.6381 | 217 088 | 78 |
-| E3 | GRU | Sí | 128 | 18 | 0.7312 | 0.7909 | 0.6016 | 299 393 | 163 |
-| **E4** | GRU | No | **256** | 12 | **0.6057** | **0.8217** | **0.6451** | 628 224 | 105 |
+| E1 | LSTM | No | 128 | 20 | 0.7490 | 0.7904 | 0.5999 | 266 752 | 85 |
+| E2 | GRU | No | 128 | 19 | 0.6339 | 0.8158 | 0.6380 | 217 088 | 77 |
+| E3 | GRU | Sí | 128 | 19 | 0.7311 | 0.7909 | 0.6040 | 299 393 | 187 |
+| **E4** | GRU | No | **256** | 12 | **0.6057** | **0.8217** | **0.6451** | 628 224 | 123 |
 
 Dispositivo: CPU. Las curvas de pérdida están en `results/curves/` y en cada run de MLflow.
 
 **Lectura de la tabla:**
 
 - **E1 vs. E2.** El GRU logra menor pérdida que el LSTM (0.634 frente a 0.749) con menos parámetros. Las dos curvas seguían bajando en la época 20, así que con 20 épocas el LSTM, más lento de optimizar, quedó más atrás.
-- **E3 (atención) no mejora a E2.** En validación con teacher forcing, el decoder ya ve el paso real anterior, y en estos corales ese paso es muy informativo: aproximadamente el 75 % de los pasos repite el acorde anterior. La atención agrega parámetros y una entrada de 128 dimensiones más al decoder. Desde la época 13, la validación casi no mejora (0.745 → 0.731), mientras el entrenamiento sigue bajando (0.665 → 0.539), es decir, tiende a sobreajustar antes.
+- **E3 (atención) no mejora a E2.** En validación con teacher forcing, el decoder ya ve el paso real anterior, y en estos corales ese paso es muy informativo: aproximadamente el 75 % de los pasos repite el acorde anterior. La atención agrega parámetros y una entrada de 128 dimensiones más al decoder. Desde la época 13, la validación casi no mejora (0.745 → 0.731), mientras el entrenamiento sigue bajando (0.665 → 0.540), y en la época 20 la validación vuelve a subir (0.741): tiende a sobreajustar antes.
 - **Exactitud por paso.** Siempre es bastante menor que la exactitud por nota, porque exige acertar las 4 voces a la vez.
 
 ### Justificación de E4
@@ -172,10 +172,10 @@ Comparación entre los 32 pasos generados y los 32 pasos reales que siguen en el
 
 El mapa muestra los pesos α al generar 16 pasos libres a partir del contexto de `chorale_229` (semilla 42, T = 1.0). Filas: paso generado (1 a 16). Columnas: paso del contexto (1 a 32).
 
-- **La atención no es uniforme ni solo se fija en lo reciente.** Con pesos uniformes, cada paso recibiría 1/32 ≈ 0.031. El peso máximo promedio por fila es 0.158, unas 5 veces más. Los últimos 8 pasos del contexto reciben solo el 22.3 % del peso total.
-- **Se concentra en bloques de 2 pasos.** La columna dominante es 23–24, el máximo en 10 de las 16 filas. También aparecen 11–12 (fila 1), 15–16 (fila 9) y 30–32 (filas 11–12). Los bloques de 2 coinciden con la duración de los acordes: el modelo atiende al acorde completo, no a un paso suelto.
-- **Elige acordes relacionados con lo que genera.** El paso 23–24 del contexto es el acorde `[69, 65, 60, 50]`. Los primeros pasos generados (`[74, 69, 62, 53]`, `[74, 69, 61, 50]`) repiten su La 69 en la contralto y su Re 50 en el bajo.
-- **El patrón cambia a lo largo del bloque.** A mitad del bloque (filas 11–12), la atención se mueve al final del contexto (pasos 30–32). Al final del bloque (filas 13–16), vuelve con fuerza a 23–24.
+- **La atención no es uniforme ni solo se fija en lo reciente.** Con pesos uniformes, cada paso recibiría 1/32 ≈ 0.031. El peso máximo promedio por fila es 0.119, casi 4 veces más. Los últimos 8 pasos del contexto reciben el 27.9 % del peso total, apenas por encima del 25 % que les tocaría con pesos uniformes.
+- **Se concentra en bloques de 2 pasos.** En 9 de las 16 filas, las dos columnas con más peso son pasos vecinos que forman un mismo acorde: 11–12 (filas 1–3), 23–24 (filas 4, 6, 11 y 14) y 31–32 (filas 13 y 15). Esos bloques coinciden con la duración de los acordes del coral, que en el contexto casi siempre dura 2 o 4 pasos: el modelo atiende al acorde completo, no a un paso suelto.
+- **Los acordes elegidos son puntos de llegada de la línea del bajo.** El contexto tiene un bajo que sube por grados: 48 → 50 → 52 → **53** (pasos 11–12) y luego 45 → 47 → 48 → **50** (pasos 23–24). La atención se fija justo en esos acordes, `[72, 67, 64, 53]` y `[69, 65, 60, 50]`, y en el acorde final del contexto, `[72, 64, 60, 57]` (pasos 29–32).
+- **El patrón cambia a lo largo del bloque.** Las primeras filas miran sobre todo al acorde de los pasos 11–12. Desde la fila 4 el peso pasa a 23–24, en las filas 7–9 aparece también el paso 16, y en la segunda mitad del bloque la atención se mueve hacia el final del contexto: en las filas 13 y 15, los pasos 25–32 reciben más del 50 % del peso.
 
 Este análisis describe **un** ejemplo y no prueba una regla general. Además, E3 tuvo peor pérdida que E2, así que la atención no se tradujo en mejores predicciones con este presupuesto de épocas.
 
@@ -192,7 +192,7 @@ Verificación desde otro proceso, fuera de la carpeta del repo, con las credenci
 
 ```
 $ cd /tmp && python ~/bach-seq/scripts/check_load.py
-Cargado bach-chorales-grupoG v1 (run bcce3fe0738d4fbba0acc9f23531f41e) [bach.models.Seq2Seq]; generado (33, 4), rango 43-71
+Cargado bach-chorales-grupoG v1 (run 1e255a87c0714723b9407ce981ab320f) [bach.models.Seq2Seq]; generado (33, 4), rango 38-69
 ```
 
 Sin la contraseña en el entorno, el mismo comando falla con `401`: el servidor no entrega el modelo sin autenticación.
@@ -241,8 +241,8 @@ Resultado: `12 passed` (`results/pytest_api.txt`).
 
 ```
 GET /health                -> 200  {'status': 'ok', 'model': 'bach-chorales-grupoG', 'version': '1'}
-valida, steps=16           -> 200  generated 16x4, primeros 2: [[74, 69, 65, 53], [74, 69, 65, 53]], model=bach-chorales-grupoG, version='1'
-steps=33                   -> 200  generated 33x4, primeros 2: [[74, 70, 65, 46], [74, 70, 65, 46]], model=bach-chorales-grupoG, version='1'
+valida, steps=16           -> 200  generated 16x4, primeros 2: [[74, 70, 65, 50], [74, 70, 65, 50]], model=bach-chorales-grupoG, version='1'
+steps=33                   -> 200  generated 33x4, primeros 2: [[74, 69, 65, 58], [74, 69, 65, 58]], model=bach-chorales-grupoG, version='1'
 invalida: nota 200         -> 422  less_than_equal en ['body', 'seed', 0, 0]: Input should be less than or equal to 127
 invalida: 31 pasos         -> 422  too_short en ['body', 'seed']: List should have at least 32 items after validation, not 31
 invalida: steps=65         -> 422  less_than_equal en ['body', 'steps']: Input should be less than or equal to 64
