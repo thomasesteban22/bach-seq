@@ -12,6 +12,7 @@ venv/
 # credenciales: nunca al repo
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 credentials*
