@@ -1,0 +1,9 @@
+{
+  "selected_run": "E4",
+  "run_id": "bcce3fe0738d4fbba0acc9f23531f41e",
+  "val_loss": 0.6057282432519249,
+  "test_windows": 1011,
+  "test_loss": 0.6256049038984184,
+  "test_note_acc": 0.8157146389713156,
+  "test_step_acc": 0.6267927794263106
+}

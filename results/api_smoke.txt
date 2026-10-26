@@ -1,0 +1,7 @@
+GET /health                -> 200  {'status': 'ok', 'model': 'bach-chorales-grupoG', 'version': '1'}
+valida, steps=16           -> 200  generated 16x4, primeros 2: [[74, 69, 65, 53], [74, 69, 65, 53]], model=bach-chorales-grupoG, version='1'
+steps=33                   -> 200  generated 33x4, primeros 2: [[74, 70, 65, 46], [74, 70, 65, 46]], model=bach-chorales-grupoG, version='1'
+invalida: nota 200         -> 422  less_than_equal en ['body', 'seed', 0, 0]: Input should be less than or equal to 127
+invalida: 31 pasos         -> 422  too_short en ['body', 'seed']: List should have at least 32 items after validation, not 31
+invalida: steps=65         -> 422  less_than_equal en ['body', 'steps']: Input should be less than or equal to 64
+invalida: temperature=2    -> 422  less_than_equal en ['body', 'temperature']: Input should be less than or equal to 1.5

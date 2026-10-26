@@ -1,0 +1,15 @@
+# Probado con Python 3.12 (Ubuntu 24.04). En EC2 sin GPU, instalar primero torch CPU:
+#   pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+# y luego: pip install -r requirements.txt
+torch==2.4.1
+numpy==1.26.4
+pandas==2.2.3
+matplotlib==3.9.2
+pretty_midi==0.2.11.post0
+mlflow==2.16.2
+sqlalchemy==2.0.36
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.9.2
+httpx==0.27.2
+pytest==8.3.3

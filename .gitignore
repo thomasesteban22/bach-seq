@@ -1,0 +1,17 @@
+# datos y salidas locales
+data/
+mlruns/
+mlartifacts/
+mlflow.db
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+
+# credenciales: nunca al repo
+.env
+.env.*
+*.pem
+*.key
+credentials*

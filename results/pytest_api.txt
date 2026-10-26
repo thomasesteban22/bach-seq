@@ -1,0 +1,13 @@
+tests/test_api.py::test_health PASSED                                    [  8%]
+tests/test_api.py::test_generate_valid PASSED                            [ 16%]
+tests/test_api.py::test_generate_33_steps PASSED                         [ 25%]
+tests/test_api.py::test_generate_invalid[payload0] PASSED                [ 33%]
+tests/test_api.py::test_generate_invalid[payload1] PASSED                [ 41%]
+tests/test_api.py::test_generate_invalid[payload2] PASSED                [ 50%]
+tests/test_api.py::test_generate_invalid[payload3] PASSED                [ 58%]
+tests/test_api.py::test_generate_invalid[payload4] PASSED                [ 66%]
+tests/test_api.py::test_generate_invalid[payload5] PASSED                [ 75%]
+tests/test_api.py::test_generate_invalid[payload6] PASSED                [ 83%]
+tests/test_api.py::test_generate_invalid[payload7] PASSED                [ 91%]
+tests/test_api.py::test_generate_invalid[payload8] PASSED                [100%]
+============================== 12 passed in 5.83s ==============================

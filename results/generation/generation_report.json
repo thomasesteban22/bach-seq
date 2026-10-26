@@ -1,0 +1,114 @@
+{
+  "model_run": "E4",
+  "run_id": "bcce3fe0738d4fbba0acc9f23531f41e",
+  "steps": 32,
+  "temperature": 1.0,
+  "sampling_seed": 42,
+  "tempo_bpm": 80,
+  "step_duration_s": 0.1875,
+  "chorales": [
+    {
+      "valid_index": 0,
+      "chorale": "chorale_229",
+      "sampling_seed": 42,
+      "midi": "chorale_229_continuacion.mid",
+      "stats_generado": {
+        "silencios_%": 0.0,
+        "repeticion_%": 48.4,
+        "notas_distintas_por_voz": {
+          "note0": 5,
+          "note1": 5,
+          "note2": 7,
+          "note3": 4
+        },
+        "pasos_distintos": 17,
+        "rango_por_voz": {
+          "note0": "69-76",
+          "note1": "61-69",
+          "note2": "57-66",
+          "note3": "47-53"
+        }
+      },
+      "stats_original_mismo_tramo": {
+        "silencios_%": 0.0,
+        "repeticion_%": 74.2,
+        "notas_distintas_por_voz": {
+          "note0": 3,
+          "note1": 3,
+          "note2": 6,
+          "note3": 6
+        },
+        "pasos_distintos": 9,
+        "rango_por_voz": {
+          "note0": "72-76",
+          "note1": "67-72",
+          "note2": "55-67",
+          "note3": "48-57"
+        }
+      }
+    },
+    {
+      "valid_index": 40,
+      "chorale": "chorale_269",
+      "sampling_seed": 43,
+      "midi": "chorale_269_continuacion.mid",
+      "stats_generado": {
+        "silencios_%": 0.0,
+        "repeticion_%": 58.1,
+        "notas_distintas_por_voz": {
+          "note0": 5,
+          "note1": 4,
+          "note2": 5,
+          "note3": 4
+        },
+        "pasos_distintos": 13,
+        "rango_por_voz": {
+          "note0": "71-76",
+          "note1": "64-71",
+          "note2": "57-65",
+          "note3": "50-55"
+        }
+      },
+      "stats_original_mismo_tramo": {
+        "silencios_%": 0.0,
+        "repeticion_%": 77.4,
+        "notas_distintas_por_voz": {
+          "note0": 4,
+          "note1": 2,
+          "note2": 4,
+          "note3": 6
+        },
+        "pasos_distintos": 8,
+        "rango_por_voz": {
+          "note0": "69-74",
+          "note1": "66-67",
+          "note2": "59-64",
+          "note3": "43-55"
+        }
+      }
+    }
+  ],
+  "attention_E3": {
+    "chorale": "chorale_229",
+    "argmax_context_step_por_paso": [
+      12,
+      24,
+      24,
+      24,
+      24,
+      24,
+      25,
+      19,
+      16,
+      24,
+      32,
+      32,
+      24,
+      24,
+      24,
+      24
+    ],
+    "peso_ultimos_8_pasos_%": 22.3,
+    "peso_max_medio": 0.158
+  }
+}

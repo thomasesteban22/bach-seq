@@ -1,0 +1,18 @@
+# API FastAPI. Lee las variables (incluidas credenciales de MLflow) de /etc/bach-api.env.
+# Copiar a /etc/systemd/system/bach-api.service
+[Unit]
+Description=Bach chorales API (FastAPI)
+After=network-online.target mlflow.service
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/bach-seq
+EnvironmentFile=/etc/bach-api.env
+ExecStart=/home/ubuntu/bach-seq/.venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000
+# Si MLflow aun no responde al arrancar, systemd reintenta.
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
