@@ -4,13 +4,14 @@ La solución completa corre en **una sola instancia EC2**:
 
 ```
 EC2 Ubuntu 24.04 (t3.large)
- ├─ mlflow.service   puerto 5000   MLflow Tracking + Model Registry + artefactos (con usuario y contraseña)
+ ├─ mlflow.service   puerto 5000   MLflow Tracking + Model Registry + artefactos (sin autenticación)
  ├─ entrenamiento    scripts/train.py ... (se corre una vez, en la misma máquina)
  └─ bach-api.service puerto 8000   FastAPI, carga el modelo champion al arrancar
 ```
 
 - **Por qué en la misma máquina:** con CPU, el entrenamiento de E1–E4 tarda unos 15 minutos y no hace falta GPU. Además, la API carga el modelo desde MLflow por la red local.
-- **Si el curso o un compañero ya tiene un servidor MLflow** (como en el laboratorio 2), sáltate el paso 4. En `.env` y `/etc/bach-api.env` pon la URL y las credenciales de ese servidor.
+- **Si el curso o un compañero ya tiene un servidor MLflow** (como en el laboratorio 2), sáltate el paso 4. En `.env` y `/etc/bach-api.env` pon la URL de ese servidor y, si usa autenticación, agrega `MLFLOW_TRACKING_USERNAME` y `MLFLOW_TRACKING_PASSWORD`.
+- **Sin autenticación en MLflow:** la instancia solo se enciende para trabajar y para la sustentación, y se apaga el resto del tiempo. Mientras está encendida, cualquiera que conozca la IP puede ver y modificar el servidor MLflow. Si la instancia fuera a quedar encendida, conviene restringir el puerto 5000 a IP conocidas.
 
 Convenciones de esta guía:
 
@@ -57,10 +58,10 @@ En la consola de AWS ve a **EC2 → Launch instance**:
 | Puerto | Origen | Para qué |
 |---|---|---|
 | 22 (SSH) | My IP | administrar la máquina |
-| 5000 (MLflow) | My IP + IP de los compañeros + IP del docente | interfaz y API de MLflow |
-| 8000 (API) | My IP + IP del docente | probar la API |
+| 5000 (MLflow) | Anywhere-IPv4 (`0.0.0.0/0`) | interfaz y API de MLflow |
+| 8000 (API) | Anywhere-IPv4 (`0.0.0.0/0`) | probar la API |
 
-La guía del laboratorio no exige publicar el servicio abierto a Internet. Si no conoces la IP del docente, abre el 8000 a `0.0.0.0/0` solo durante la sustentación y ciérralo después. MLflow queda protegido además con usuario y contraseña.
+Abrir 5000 y 8000 a cualquier IPv4 permite que el docente entre desde cualquier red sin conocer su IP. Como ni MLflow ni la API tienen autenticación, la instancia se mantiene **apagada** fuera de las sesiones de trabajo y de la sustentación. Si prefieres restringirlos, usa My IP más las IP de los compañeros y del docente.
 
 **IP elástica.** Ve a EC2 → Elastic IPs → Allocate y luego **Associate** a la instancia. Así la IP no cambia cuando la instancia se apaga y se vuelve a prender, y las URLs que entregas siguen sirviendo.
 
@@ -94,35 +95,17 @@ Si el repositorio es privado, `git clone` pide usuario y contraseña. En la cont
 
 ```bash
 mkdir -p ~/mlflow-server
-cp ~/bach-seq/deploy/basic_auth.ini ~/mlflow-server/
-chmod 600 ~/mlflow-server/basic_auth.ini
 sudo cp ~/bach-seq/deploy/mlflow.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now mlflow
 curl -s localhost:5000/health        # debe responder OK
 ```
 
-**Cambia de inmediato la contraseña inicial del admin**, que es `password`, y crea un usuario de solo lectura para el docente. Escribe las contraseñas reales en lugar de los `<...>`:
-
-```bash
-curl -u admin:password -X PATCH localhost:5000/api/2.0/mlflow/users/update-password \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"<contrasena-admin>"}'
-
-curl -u admin:<contrasena-admin> -X POST localhost:5000/api/2.0/mlflow/users/create \
-  -H "Content-Type: application/json" \
-  -d '{"username":"docente","password":"<contrasena-docente>"}'
-```
-
-El usuario `docente` puede **ver** todo, pero no puede borrar ni modificar nada, porque `default_permission = READ`. Comparte su contraseña con el docente por un canal privado, nunca en el repo.
-
-Para borrar esos comandos del historial de la terminal, ejecuta `history -c`.
-
-Comprueba en el navegador que `http://<IP>:5000` pida usuario y contraseña.
+Comprueba en el navegador que `http://<IP>:5000` abra la interfaz de MLflow.
 
 ## 5. Entrenar, seleccionar, generar y registrar (en la EC2)
 
-Crea el archivo de credenciales. Queda solo en la máquina, porque `.gitignore` lo excluye.
+Crea el archivo de configuración. Queda solo en la máquina, porque `.gitignore` lo excluye.
 
 ```bash
 cd ~/bach-seq
@@ -134,8 +117,6 @@ El contenido de `.env` debe quedar así:
 
 ```
 MLFLOW_TRACKING_URI=http://127.0.0.1:5000
-MLFLOW_TRACKING_USERNAME=admin
-MLFLOW_TRACKING_PASSWORD=<contrasena-admin>
 MLFLOW_EXPERIMENT=nlp-bach-grupoG
 MODEL_NAME=bach-chorales-grupoG
 ```
@@ -168,7 +149,6 @@ Para hacer otra vez el E4 con un cambio distinto, puedes correr por ejemplo `pyt
 
 ```bash
 sudo cp ~/bach-seq/deploy/bach-api.env.example /etc/bach-api.env
-sudo nano /etc/bach-api.env          # pon la contraseña real del admin
 sudo chmod 600 /etc/bach-api.env
 sudo cp ~/bach-seq/deploy/bach-api.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -223,7 +203,7 @@ En la EC2 corre `cd ~/bach-seq && git pull` para que el repo de la máquina qued
 | Entregable | Valor |
 |---|---|
 | Repositorio | `https://github.com/<usuario-github>/bach-seq` |
-| Experimento MLflow | `http://<IP>:5000/#/experiments/<id>`, con usuario `docente` y su contraseña (por canal privado) |
+| Experimento MLflow | `http://<IP>:5000/#/experiments/<id>` (sin usuario ni contraseña) |
 | Modelo registrado | `bach-chorales-grupoG`, alias `champion`, versión y run de origen (en MLflow → Models) |
 | API | `http://<IP>:8000/docs` (`/health` y `/generate`) |
 
@@ -234,14 +214,15 @@ En la EC2 corre `cd ~/bach-seq && git pull` para que el repo de la máquina qued
    systemctl status mlflow bach-api
    ```
 2. Ejecuta `curl http://<IP>:8000/health` desde tu PC.
-3. Si el docente se conecta desde otra red, agrega su IP al security group en los puertos 5000 y 8000.
+3. Si la instancia no tiene IP elástica, su IP pública cambia cada vez que se enciende. Toma la nueva de la consola de EC2 y actualiza los enlaces del README antes de dárselos al docente.
+4. Al terminar la sustentación, apaga la instancia: MLflow y la API no tienen autenticación.
 
 ## Problemas comunes
 
 | Síntoma | Causa y solución |
 |---|---|
 | `pip` descarga paquetes `nvidia-*` de varios GB | Faltó instalar torch CPU **antes** de `requirements.txt` (paso 3). |
-| `401 Unauthorized` al entrenar o en la API | Falta cargar `.env` (`set -a && source .env && set +a`) o la contraseña en `/etc/bach-api.env` está mal. |
-| `bach-api` se reinicia en bucle | Revisa `journalctl -u bach-api -n 50`. Lo usual es que todavía no exista la versión `champion` (falta el paso 5) o que las credenciales estén mal. |
+| Los scripts no encuentran el experimento o el modelo | Falta cargar `.env` (`set -a && source .env && set +a`), así que MLflow usa una carpeta local en lugar del servidor. |
+| `bach-api` se reinicia en bucle | Revisa `journalctl -u bach-api -n 50`. Lo usual es que todavía no exista la versión `champion` (falta el paso 5) o que `MLFLOW_TRACKING_URI` en `/etc/bach-api.env` esté mal. |
 | No abre `http://<IP>:8000` desde tu PC | El security group no incluye tu IP actual, o la IP de la instancia cambió (asocia la IP elástica). |
 | `ImportError ... FallbackAsyncAdaptedQueuePool` | Hay una versión de SQLAlchemy incompatible. `requirements.txt` fija `sqlalchemy==2.0.36`; reinstala con `pip install -r requirements.txt`. |

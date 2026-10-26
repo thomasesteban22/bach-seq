@@ -1,4 +1,4 @@
-# API FastAPI. Lee las variables (incluidas credenciales de MLflow) de /etc/bach-api.env.
+# API FastAPI. Lee las variables de MLflow (URI y nombre del modelo) de /etc/bach-api.env.
 # Copiar a /etc/systemd/system/bach-api.service
 [Unit]
 Description=Bach chorales API (FastAPI)

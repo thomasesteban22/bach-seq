@@ -1,4 +1,4 @@
-# Servidor MLflow (tracking + registry + artefactos servidos por HTTP) con usuario y contrasena.
+# Servidor MLflow (tracking + registry + artefactos servidos por HTTP), sin autenticacion.
 # Copiar a /etc/systemd/system/mlflow.service
 [Unit]
 Description=MLflow Tracking Server (bach)
@@ -8,9 +8,7 @@ Wants=network-online.target
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/mlflow-server
-Environment=MLFLOW_AUTH_CONFIG_PATH=/home/ubuntu/mlflow-server/basic_auth.ini
 ExecStart=/home/ubuntu/bach-seq/.venv/bin/mlflow server \
-    --app-name basic-auth \
     --host 0.0.0.0 --port 5000 --workers 2 \
     --backend-store-uri sqlite:////home/ubuntu/mlflow-server/mlflow.db \
     --artifacts-destination /home/ubuntu/mlflow-server/mlartifacts

@@ -2,13 +2,15 @@
 
 Proyecto de modelos de secuencias sobre **JSB Chorales**. A partir de 32 pasos de un coral (4 voces por paso), el modelo predice los 16 pasos siguientes. Se comparan cuatro configuraciones registradas en MLflow (E1–E4). El modelo elegido se registra en Model Registry con el alias `champion` y se sirve con FastAPI en AWS EC2.
 
-> **Nota sobre los números.** Las cifras de este README salen de la corrida del pipeline en la EC2 del proyecto (Ubuntu 24.04, t3.large, Python 3.12, torch 2.4.1 CPU), registrada en el servidor MLflow de esa misma máquina, con usuario y contraseña. Los archivos de `results/` son los de esa corrida.
+> **Nota sobre los números.** Las cifras de este README salen de la corrida del pipeline en la EC2 del proyecto (Ubuntu 24.04, t3.large, Python 3.12, torch 2.4.1 CPU), registrada en el servidor MLflow de esa misma máquina. Los archivos de `results/` son los de esa corrida.
 
 **Enlaces de entrega:**
 
 - Repositorio: `https://github.com/thomasesteban22/bach-seq`
-- MLflow: `http://54.198.160.150:5000`, experimento `nlp-bach-grupoG` (usuario `docente`, de solo lectura)
+- MLflow: `http://54.198.160.150:5000`, experimento `nlp-bach-grupoG` (sin usuario ni contraseña)
 - API: `http://54.198.160.150:8000/docs`
+
+La instancia se mantiene apagada fuera de la sustentación. La IP pública puede cambiar al encenderla; en ese caso se actualizan estos enlaces.
 
 ---
 
@@ -197,14 +199,14 @@ Este análisis describe **un** ejemplo y no prueba una regla general. Además, E
 - Usa `code_paths=["bach"]`, para que `Seq2Seq`, con su método `generate`, se pueda importar al cargar el modelo. Si la versión de MLflow ofrece `serialization_format`, usa `"pickle"`; MLflow 2.16 no ofrece ese parámetro y guarda el objeto completo con pickle por defecto.
 - Registra el modelo con el nombre `MODEL_NAME` (por defecto `bach-chorales-grupoG`) y le asigna el alias `champion`.
 
-Verificación desde otro proceso, fuera de la carpeta del repo, con las credenciales de MLflow en el entorno. El script resuelve `champion` a un número de versión y carga `models:/<nombre>/<versión>`, no un archivo local:
+Verificación desde otro proceso, fuera de la carpeta del repo, con `MLFLOW_TRACKING_URI` apuntando al servidor. El script resuelve `champion` a un número de versión y carga `models:/<nombre>/<versión>`, no un archivo local:
 
 ```
 $ cd /tmp && python ~/bach-seq/scripts/check_load.py
 Cargado bach-chorales-grupoG v1 (run 1e255a87c0714723b9407ce981ab320f) [bach.models.Seq2Seq]; generado (33, 4), rango 38-69
 ```
 
-Sin la contraseña en el entorno, el mismo comando falla con `401`: el servidor no entrega el modelo sin autenticación.
+El rango de notas cambia en cada ejecución porque la generación de prueba muestrea con T = 1.0.
 
 ## 9. API
 
@@ -276,7 +278,7 @@ invalida: temperature=2    -> 422  less_than_equal en ['body', 'temperature']: I
 
 ## 10. Instalación y ejecución
 
-El despliegue completo en AWS (EC2, servidor MLflow con usuario y contraseña, servicios systemd, security group e IP elástica) está en **[DEPLOY_AWS.md](DEPLOY_AWS.md)**. Resumen de los comandos:
+El despliegue completo en AWS (EC2, servidor MLflow, servicios systemd, security group e IP elástica) está en **[DEPLOY_AWS.md](DEPLOY_AWS.md)**. Resumen de los comandos:
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -296,15 +298,10 @@ pytest -v tests/test_api.py
 
 ## Seguridad
 
-- El repositorio no contiene claves, tokens ni contraseñas. La URL de MLflow, las credenciales, el experimento y el nombre del modelo se leen de variables de entorno.
-- El servidor MLflow corre con autenticación (`--app-name basic-auth`).
-  - La contraseña inicial del admin se cambia al instalarlo.
-  - El docente recibe un usuario de **solo lectura** (`docente`): puede consultar runs y el modelo (`200`), y se le niega modificar (verificado en la EC2: renombrar el experimento responde `403 Permission denied`).
-- Las credenciales viven solo en la EC2:
-  - `~/bach-seq/.env` (chmod 600, ignorado por git), para entrenar.
-  - `/etc/bach-api.env` (chmod 600), para el servicio de la API.
-- Durante la entrega y la sustentación, el security group abre los puertos 5000 y 8000 a cualquier IPv4, para que el docente pueda entrar desde cualquier red. MLflow sigue exigiendo usuario y contraseña (sin credenciales responde `401`). La API no tiene autenticación, que la práctica no exige. Al terminar la evaluación, esos puertos se restringen a las IP del equipo o se cierran.
-- `.gitignore` excluye `.env`, `*.pem`, `*.key`, datos, `mlruns/` y `mlflow.db`.
+- El repositorio no contiene claves, tokens ni contraseñas. La URL de MLflow, el experimento y el nombre del modelo se leen de variables de entorno (`~/bach-seq/.env` y `/etc/bach-api.env` en la EC2, ambos fuera de git).
+- **Ni el servidor MLflow ni la API tienen autenticación.** La práctica no la exige, y así el docente puede consultar MLflow y probar la API sin credenciales. El security group abre los puertos 5000 y 8000 a cualquier IPv4 para que pueda entrar desde cualquier red.
+- La contrapartida es que, mientras la instancia está encendida, cualquiera que conozca la IP podría modificar o borrar runs y modelos en MLflow. Para limitar ese riesgo, **la instancia se mantiene apagada** fuera de las sesiones de trabajo y de la sustentación.
+- La llave SSH (`.pem`) queda solo en los equipos del grupo. `.gitignore` excluye `.env`, `*.pem`, `*.key`, datos, `mlruns/` y `mlflow.db`.
 
 ## Declaración de uso de herramientas de IA
 
@@ -314,7 +311,7 @@ Este laboratorio se hizo en **colaboración híbrida entre el grupo G y Claude (
 
 - Definir el alcance a partir de la guía del laboratorio y decidir qué entregar.
 - Crear el repositorio en GitHub y la instancia EC2 en AWS Academy, y configurar su security group.
-- Decidir cómo exponer los servicios (puertos 5000 y 8000) y cómo dar acceso al docente.
+- Decidir cómo exponer los servicios: puertos 5000 y 8000 abiertos, MLflow sin autenticación y la instancia apagada fuera de la sustentación.
 - Dirigir cada etapa, pedir correcciones y comparar el resultado con la guía.
 - Probar la API desde sus propios equipos y preparar la sustentación.
 
@@ -329,6 +326,6 @@ Este laboratorio se hizo en **colaboración híbrida entre el grupo G y Claude (
 
 - Todas las cifras de este README salen de la corrida registrada en MLflow, no de valores escritos a mano.
 - Los modelos se entrenaron desde cero con los datos del laboratorio. No se usó ningún servicio externo de generación musical ni modelos preentrenados.
-- Las contraseñas de MLflow se generaron en la EC2 y no pasaron por la conversación con la IA ni están en el repositorio.
+- El repositorio no contiene llaves, tokens ni contraseñas.
 
 El grupo es responsable del contenido entregado y debe poder explicar el código, los resultados y las decisiones durante la sustentación.
