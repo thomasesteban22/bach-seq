@@ -34,6 +34,7 @@ scripts/
   api_smoke.py         prueba HTTP de la API desplegada
 api/main.py            FastAPI: GET /health, POST /generate
 tests/test_api.py      pytest de la API (válida, steps=33, inválidas)
+tests/test_unit.py     pruebas unitarias de datos, modelos, pérdida, métricas, generación y MIDI
 ejemplos/              solicitudes JSON listas para probar /generate con curl o /docs
 deploy/                servicios systemd (MLflow y API) y plantillas de configuración para EC2
 DEPLOY_AWS.md          guía paso a paso de despliegue en AWS
@@ -255,7 +256,20 @@ El mismo contenido se puede pegar en `/docs` → `POST /generate` → *Try it ou
 
 ### Pruebas
 
-`pytest -v tests/test_api.py` usa el modelo champion real. Cubre:
+Hay dos suites. Las dos pasan en la EC2: **43 pruebas**, 31 unitarias y 12 de la API.
+
+**Pruebas unitarias** (`pytest -v tests/test_unit.py`, 31 pruebas). No necesitan MLflow ni red: usan corales sintéticos y modelos sin entrenar. Cubren:
+
+- **Datos:** strides 8/16/16, forma y cantidad de ventanas, que cada ventana sea un tramo contiguo del coral, que ninguna cruce el límite entre dos corales y que el resto final se descarte. También que `load_split` rechace columnas inesperadas y notas fuera de 0–127. Si el dataset está descargado, comprueban las particiones reales (229 / 76 / 77 corales y 5681 / 982 / 1011 ventanas).
+- **Modelos:** logits de forma `(batch, 16, 4, 128)` en E1–E3, y pesos de atención de E3 que suman 1 sobre los 32 pasos. El número de parámetros coincide con la tabla de la sección 5.
+- **Teacher forcing:** la salida del paso k no cambia si se altera el objetivo y_k, y la del paso k+1 sí. Así se comprueba que el decoder recibe el paso real **anterior** y nunca el que debe predecir.
+- **Pérdida y métricas:** `loss_fn` es la entropía cruzada promedio sobre las 64 notas, con el silencio 0 como una clase más. Las exactitudes por nota y por paso se verifican con un modelo que acierta todo y con otro que falla una voz en la mitad de los pasos (56/64 y 0.5).
+- **Generación:** bloques de 16 (33 pasos = 16 + 16 + 1, con un mapa de atención por bloque), notas en 0–127, resultado reproducible con la misma semilla y rechazo de un contexto que no sea 32×4.
+- **MIDI y estadísticas:** las notas iguales consecutivas se fusionan, el 0 no produce nota, cada paso dura 0.1875 s a 80 negras por minuto, y los indicadores de repetición, variedad y silencios se calculan bien.
+
+Para comprobar que estas pruebas detectan errores reales, se introdujeron dos fallos a propósito en una copia del código. Cuando el decoder recibe y_k en lugar de y_(k-1), fallan las 3 pruebas de teacher forcing. Cuando las ventanas se salen del coral, fallan 7 pruebas de datos.
+
+**Pruebas de la API.** `pytest -v tests/test_api.py` usa el modelo champion real. Cubre:
 
 - `/health`
 - una petición válida, verificando longitud y rango de las notas
@@ -293,7 +307,8 @@ python scripts/generate_midi.py         # MIDI + mapa de atención de E3
 python scripts/register_model.py        # Model Registry + alias champion
 (cd /tmp && python ~/bach-seq/scripts/check_load.py)   # carga desde otro proceso
 uvicorn api.main:app --host 0.0.0.0 --port 8000
-pytest -v tests/test_api.py
+pytest -v tests/test_unit.py            # no necesita MLflow
+pytest -v tests/test_api.py             # necesita MLflow con el modelo champion
 ```
 
 ## Seguridad
